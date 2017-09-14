@@ -1,0 +1,74 @@
+package org.apache.tomcat.util.http.fileupload;
+
+import org.apache.tomcat.util.http.fileupload.FileCleaningTrackerTracker;
+import java.rmi.RemoteException;
+import classesGerenciadoras.Gerenciadornuvem0Interface;
+import classesGerenciadoras.Gerenciadornuvem1Interface;
+import java.rmi.RemoteException;
+import java.rmi.NotBoundException;
+import java.net.MalformedURLException;
+import java.rmi.Naming;
+import org.apache.tomcat.util.http.fileupload.FileCleaningTrackerRemoteInterface;
+import org.apache.tomcat.util.http.fileupload.FileCleaningTrackerTrackerRemoteInterface;
+
+//-----------------------------------------------------------------------
+/**
+ * The reaper thread.
+ */
+public final class FileCleaningTrackerReaper extends Thread implements FileCleaningTrackerReaperRemoteInterface {
+    public static Gerenciadornuvem1Interface gerenciadornuvem1;
+	public static Gerenciadornuvem0Interface gerenciadornuvem0;
+	/**
+	 * 
+	 */
+	private final FileCleaningTrackerRemoteInterface fileCleaningTracker;
+
+	/** Construct a new FileCleaningTrackerReaper 
+     * @param fileCleaningTracker TODO*/
+    public FileCleaningTrackerReaper(FileCleaningTrackerRemoteInterface fileCleaningTracker) throws RemoteException, RemoteException {
+        super("File Reaper");
+		startManagers();
+		this.fileCleaningTracker = fileCleaningTracker;
+        setPriority(Thread.MAX_PRIORITY);
+        setDaemon(true);
+    }
+
+    /**
+     * Run the reaper thread that will delete files as their associated
+     * marker objects are reclaimed by the garbage collector.
+     */
+    @Override
+    public void run() throws RemoteException, RemoteException {
+        // thread exits when exitWhenFinished is true and there are no more tracked objects
+        while (this.fileCleaningTracker.isExitWhenFinished() == false || this.fileCleaningTracker.getTrackers().size() > 0) {
+            try {
+                // Wait for a tracker to remove.
+            	FileCleaningTrackerTrackerRemoteInterface tracker = (FileCleaningTrackerTrackerRemoteInterface) this.fileCleaningTracker.getQ().remove(); // cannot return null
+                this.fileCleaningTracker.getTrackers().remove(tracker);
+                if (!tracker.delete()) {
+                    this.fileCleaningTracker.getDeleteFailures().add(tracker.getPath());
+                }
+                tracker.clear();
+            } catch (InterruptedException e) {
+                continue;
+            }
+        }
+    }
+
+	public static void startManagers() {
+		try {
+			if (gerenciadornuvem0 == null)
+				gerenciadornuvem0 = (Gerenciadornuvem0Interface) Naming
+						.lookup("rmi://0:1099/gerenciadornuvem0");
+			if (gerenciadornuvem1 == null)
+				gerenciadornuvem1 = (Gerenciadornuvem1Interface) Naming
+						.lookup("rmi://1:1099/gerenciadornuvem1");
+		} catch (RemoteException e) {
+			e.printStackTrace();
+		} catch (NotBoundException e) {
+			e.printStackTrace();
+		} catch (MalformedURLException e) {
+			e.printStackTrace();
+		}
+	}
+}
